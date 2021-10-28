@@ -1,0 +1,49 @@
+---
+title: "Twitter conference analysis"
+author: "Max Campbell"
+date: "28/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+library(tidyverse)
+
+data_cleaning <- function(x) {
+  within(x, {
+  rm(`...1`, favorited, replyToSN, replyToSID, replyToUID, statusSource, retweeted, longitude, latitude)
+    id <- substr(as.character(id), start = 1, stop = 14)
+    id <- gsub(".", "", id, fixed = TRUE)
+    id <- substr(id, 1, 13)
+  })
+  }
+
+#tweets_26 <- read_csv(file = "../Data/2021-10-26_tweets_CWTC21.csv") %>% data_cleaning() #these are just copies
+RTtweets_28 <- read_csv(file = "../Data/2021-10-28_tweets-and-RTs_CWTC21.csv") %>% data_cleaning()
+RTtweets_26 <- read_csv(file = "../Data/2021-10-26_tweets-and-RTs_CWTC21.csv") %>% data_cleaning() %>% filter(created < min(RTtweets_28$created))
+#tweets_28 <- read_csv(file = "../Data/2021-10-28_tweets_CWTC21.csv") %>% data_cleaning()#these are just copies
+
+
+tweet_data <- bind_rows(RTtweets_26, RTtweets_28) %>% filter(!duplicated(id, fromLast = TRUE)) %>% distinct() %>% 
+  within(text <- gsub("[^\x01-\x7F]", "", text))
+
+retweet_data <- tweet_data %>% filter(isRetweet) 
+tweet_data <- tweet_data %>% filter(!isRetweet) %>% mutate(text_id = substr(text, start = 1, stop = 60))
+
+
+retweet_data <- retweet_data %>% within(text <- gsub("RT @.*?: ", "", text)) %>% 
+  group_by(text) %>% summarise(retweets = list(c(list(screenName), list(created)))) %>% 
+  mutate(text_id = substr(text, start = 1, stop = 60))
+
+tweet_data2 <- full_join(x = retweet_data, y = tweet_data , by = "text_id")
+
+
+
+
+```
+
