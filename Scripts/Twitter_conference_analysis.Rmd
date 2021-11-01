@@ -14,35 +14,140 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 
-data_cleaning <- function(x) {
-  within(x, {
-  rm(`...1`, favorited, replyToSN, replyToSID, replyToUID, statusSource, retweeted, longitude, latitude)
-    id <- substr(as.character(id), start = 1, stop = 14)
-    id <- gsub(".", "", id, fixed = TRUE)
-    id <- substr(id, 1, 13)
-  })
-  }
+# data_cleaning <- function(x) {
+#   within(x, {
+#   rm(`...1`, favorited, replyToSN, replyToSID, replyToUID, statusSource, retweeted, longitude, latitude)
+#     id <- substr(as.character(id), start = 1, stop = 14)
+#     id <- gsub(".", "", id, fixed = TRUE)
+#     id <- substr(id, 1, 13)
+#   })
+#   }
+# 
+# #tweets_26 <- read_csv(file = "../Data/2021-10-26_tweets_CWTC21.csv") %>% data_cleaning() #these are just copies
+# RTtweets_28 <- read_csv(file = "../Data/2021-10-28_tweets-and-RTs_CWTC21.csv") %>% data_cleaning()
+# RTtweets_26 <- read_csv(file = "../Data/2021-10-26_tweets-and-RTs_CWTC21.csv") %>% data_cleaning() %>% filter(created < min(RTtweets_28$created))
+# #tweets_28 <- read_csv(file = "../Data/2021-10-28_tweets_CWTC21.csv") %>% data_cleaning()#these are just copies
 
-#tweets_26 <- read_csv(file = "../Data/2021-10-26_tweets_CWTC21.csv") %>% data_cleaning() #these are just copies
-RTtweets_28 <- read_csv(file = "../Data/2021-10-28_tweets-and-RTs_CWTC21.csv") %>% data_cleaning()
-RTtweets_26 <- read_csv(file = "../Data/2021-10-26_tweets-and-RTs_CWTC21.csv") %>% data_cleaning() %>% filter(created < min(RTtweets_28$created))
-#tweets_28 <- read_csv(file = "../Data/2021-10-28_tweets_CWTC21.csv") %>% data_cleaning()#these are just copies
+tweet_data_paid <- read_csv(file = "../Data/Tweets 21 - 29 Oct Track my hashtag.csv") %>% 
+  rename(Tweet_ID = `Tweet Id`, Tweet_URL =`Tweet URL`, Tweet_time = `Tweet Posted Time`, 
+         Tweet_content =`Tweet Content`, Tweet_type = `Tweet Type`, n_retweets = `Retweets Received`, 
+         Likes =  `Likes Received`, Tweet_location = `Tweet Location`, Tweet_language = `Tweet Language`,
+         User_ID = `User  Id`, User_Bio = `User Bio`, Verification = `Verified or Non-Verified`,
+         Profile_URL = `Profile URL`, User_followers = `User Followers`, User_following = `User Following`,
+         User_creation = `User Account Creation Date`) %>%  within({
+        
+           # Remove backslashes   
+          Tweet_ID <- gsub(pattern = "\"", "", Tweet_ID)
+          Tweet_content <- gsub(pattern = "\"", "", Tweet_content)
+          Client <- gsub(pattern = "\"", "", Client)
+          Tweet_location <- gsub(pattern = "\"", "", Tweet_location)
+          User_ID <- gsub(pattern = "\"", "", User_ID)
+          User_Bio <- gsub(pattern = "\"", "", User_Bio)
+          Name <- gsub(pattern = "\"", "", Name)
+          
+          # Remove emojis
+          Name <- gsub("[^\x01-\x7F]", "", Name)
+          User_Bio <- gsub("[^\x01-\x7F]", "", User_Bio)
+          Tweet_content <- gsub("[^\x01-\x7F]", "", Tweet_content)
+          
+          # Format times
+          Tweet_time <- as.POSIXct(Tweet_time, tz = "UTC", format = "%d %b %Y %H:%M:%S")
+          User_creation <- as.POSIXct(User_creation, tz = "UTC", format = "%d-%b-%Y %H:%M:%S")
+        
+        rm(Tweet_location, Tweet_language)
+  
+  }) %>% filter(!grepl("PakvsNz|Cricket|PakvsAfg|pakvsnz|INDvPAK|PakvsInd|Pakistan|bowler|PAKvNZ|IndvsPak|SPORTATSABC", Tweet_content, ignore.case = TRUE), # filtering cricket tweets
+                !grepl("Cricket|Pakistan", User_Bio, ignore.case = TRUE))
 
 
-tweet_data <- bind_rows(RTtweets_26, RTtweets_28) %>% filter(!duplicated(id, fromLast = TRUE)) %>% distinct() %>% 
-  within(text <- gsub("[^\x01-\x7F]", "", text))
+# tweet_data <- bind_rows(RTtweets_26, RTtweets_28) %>% filter(!duplicated(id, fromLast = TRUE)) %>% distinct() %>% 
+#   within(text <- gsub("[^\x01-\x7F]", "", text))
+# 
+# retweet_data <- tweet_data %>% filter(isRetweet) 
+# tweet_data <- tweet_data %>% filter(!isRetweet) %>% mutate(text_id = substr(text, start = 1, stop = 60))
+# 
+# 
+# retweet_data <- retweet_data %>% within(text <- gsub("RT @.*?: ", "", text)) %>% 
+#   group_by(text) %>% summarise(retweets = list(c(list(screenName), list(created)))) %>% 
+#   mutate(text_id = substr(text, start = 1, stop = 60))
+# 
+# tweet_data2 <- full_join(x = retweet_data, y = tweet_data , by = "text_id")
 
-retweet_data <- tweet_data %>% filter(isRetweet) 
-tweet_data <- tweet_data %>% filter(!isRetweet) %>% mutate(text_id = substr(text, start = 1, stop = 60))
+
+# table of top 10 most RTed/favourited, maybe a word cloud (if its not too hard) and then some 
+# numbers on total number of 'screen names' (people) tweeting or interacting (ie tweeting or RTing)
 
 
-retweet_data <- retweet_data %>% within(text <- gsub("RT @.*?: ", "", text)) %>% 
-  group_by(text) %>% summarise(retweets = list(c(list(screenName), list(created)))) %>% 
-  mutate(text_id = substr(text, start = 1, stop = 60))
-
-tweet_data2 <- full_join(x = retweet_data, y = tweet_data , by = "text_id")
+```
 
 
+
+```{r}
+# CB: table of top 10 most RTed/favourited, maybe a word cloud (if its not too hard) and then some 
+# numbers on total number of 'screen names' (people) tweeting or interacting (ie tweeting or RTing)
+
+tweets_only <- tweet_data_paid %>% filter(Tweet_type == "Tweet", !grepl("^Join ", x = Tweet_content))
+
+words_vect <- gsub("\\n", " ", x = tweets_only$Tweet_content)
+words_vect <- gsub("http.*$|Click here|", "", x = words_vect)
+words_vect <- gsub("@.* ", "", x = words_vect)
+words_vect <- gsub("\\d|\\.|,|\\!|/|\\?|:|&amp|%|\\(|\\)|\\[|\\]|#CWTC|;|'| - |", "", x = words_vect)
+words_vect <- gsub("  |   |    ", " ", x = words_vect)
+words_vect <- gsub("^ | $", "", x = words_vect)
+
+word_data <- data.frame(word = str_split(tolower(paste(words_vect, collapse = " ")), pattern = " ")[[1]])
+
+word_data <- word_data %>% within({
+  is_hashtag <-  grepl("#", x = word)
+  word <- gsub("#", "", x = word)
+  word <- gsub("mangroves", replacement = "mangrove", word)
+  word <- gsub("wetlands", replacement = "wetland", word)
+  word <- gsub("seagrasses", replacement = "seagrass", word)
+  word <- gsub("saltmarshes", replacement = "saltmarsh", word)
+  word <- gsub("ecosystems", replacement = "ecosystem", word)
+  word <- gsub("forests", replacement = "forest", word)
+  word <- gsub("impacts", replacement = "impact", word)
+  word <- gsub("habitats", replacement = "habitat", word)
+  word <- gsub("presentations|presenting|presenters", replacement = "presentation", word)
+  #word <- gsub("ing$", replacement = "", word)
+})
+
+hastag_data <- word_data %>% filter(is_hashtag) %>% group_by(word) %>% count() 
+word_data <- word_data %>% group_by(word) %>% count() %>% filter(nchar(word)>3, n > 2)
+
+library("wordcloud")
+library("RColorBrewer")
+
+png(filename = "../Outputs/word_cloud_CWTC21.png", width = 20, height = 20, units = "cm", res = 300)
+wordcloud(words = word_data$word, freq = word_data$n, min.freq = 3,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+dev.off()
+
+png(filename = "../Outputs/hashtag_cloud_CWTC21.png", width = 20, height = 20, units = "cm", res = 300)
+wordcloud(words = hastag_data$word, freq = hastag_data$n, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+dev.off()
+
+# Number of users engaged (tweeted, retweeted or commented)
+length(unique(tweet_data_paid$Username))
+
+table(tweet_data_paid$Tweet_type)
+
+
+
+top_retweeted <- tweet_data_paid %>% filter(Tweet_type == "Tweet", n_retweets >= 17) %>%
+  select(Tweet_content, n_retweets, Likes, Name, User_followers, User_following) %>% 
+  arrange(desc(n_retweets))
+
+
+top_liked <- tweet_data_paid %>% filter(Tweet_type == "Tweet", Likes >= 62) %>%
+  select(Tweet_content, n_retweets, Likes, Name, User_followers, User_following) %>% 
+  arrange(desc(Likes))
+
+write_csv(top_retweeted, file = "../Outputs/Top_retweeted.csv")
+write_csv(top_liked, file = "../Outputs/Top_liked.csv")
 
 
 ```
